@@ -1,0 +1,7 @@
+
+            const PI = 3.14
+            fun area(r: float) -> float {
+                return PI * r * r
+            }
+            print(area(5))
+            print(area(6))
