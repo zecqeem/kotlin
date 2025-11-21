@@ -141,6 +141,8 @@ public class CodeGenerator {
                 return String.format("%d.0", (long) v);
             }
             return Double.toString(v);
+        }else if (e instanceof BoolLiteral) {
+            return String.valueOf(((BoolLiteral) e).value);
         } else if (e instanceof Variable) {
             return ((Variable) e).name;
         } else if (e instanceof BinaryExpr) {
@@ -173,6 +175,7 @@ public class CodeGenerator {
     private String inferTypeName(Expr e) {
         if (e instanceof IntLiteral) return "int";
         if (e instanceof FloatLiteral) return "double";
+        if (e instanceof BoolLiteral) return "boolean";
         if (e instanceof CallExpr) return null;
         if (e instanceof Variable) return null;
         return null;

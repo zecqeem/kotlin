@@ -38,16 +38,15 @@ public class Lexer {
 
         char ch = input.charAt(pos);
 
-        // Числа
+        // number
         if (Character.isDigit(ch)) return number();
 
-        // Идентификаторы / ключевые слова
+        // isents / keywords
         if (Character.isLetter(ch)) return identifier();
 
-        // Строки
+        // strings
         if (ch == '"') return string();
 
-        // Операторы и спецсимволы
         switch (ch) {
             case '+': return token(TokenType.PLUS);
             case '-':

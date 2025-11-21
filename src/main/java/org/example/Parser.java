@@ -20,7 +20,6 @@ public class Parser {
         else throw new RuntimeException("Unexpected token: " + current + ", expected " + type);
     }
 
-    // Пример: parse программу (список statements)
     public List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
         while (current.type != TokenType.EOF) {
@@ -29,11 +28,11 @@ public class Parser {
         return statements;
     }
 
-    // Парсим statement
+    // parse statement
     private Stmt statement() {
         switch (current.type) {
-            case CONST:
-                return varDecl();
+            case CONST,INT_TYPE,FLOAT_TYPE,BOOL_TYPE:
+                return varDecl(current.type);
             case FUN:
                 return funDecl();
             case PRINT:
@@ -49,8 +48,16 @@ public class Parser {
         Expr value = expression();
         return new ReturnStmt(value);
     }
-    private Stmt varDecl() {
-        eat(TokenType.CONST);
+    private Stmt varDecl(TokenType type) {
+        if (type == TokenType.CONST){
+            eat(TokenType.CONST);
+        } else if (type == TokenType.INT_TYPE) {
+            eat(TokenType.INT_TYPE);
+        }else if (type == TokenType.FLOAT_TYPE) {
+            eat(TokenType.FLOAT_TYPE);
+        }else if (type == TokenType.BOOL_TYPE) {
+            eat(TokenType.BOOL_TYPE);
+        }
         String name = current.text;
         eat(TokenType.IDENTIFIER);
         eat(TokenType.ASSIGN);
@@ -106,7 +113,7 @@ public class Parser {
         return new ExprStmt(e);
     }
 
-    // Минимальный парсер выражений
+    // expr parser
     private Expr expression() {
         Expr left = term();
         while (current.type == TokenType.PLUS || current.type == TokenType.MINUS) {
@@ -135,12 +142,18 @@ public class Parser {
         } else if (current.type == TokenType.FLOAT) {
             left = new FloatLiteral(Double.parseDouble(current.text));
             eat(TokenType.FLOAT);
+        }else if (current.type == TokenType.TRUE) {
+            left = new BoolLiteral(true);
+            eat(TokenType.TRUE);
+        }else if (current.type == TokenType.FALSE) {
+            left = new BoolLiteral(false);
+            eat(TokenType.FALSE);
         } else if (current.type == TokenType.IDENTIFIER) {
             String name = current.text;
             eat(TokenType.IDENTIFIER);
 
             if (current.type == TokenType.LPAREN) {
-                // Вызов функции
+                // fun call
                 eat(TokenType.LPAREN);
                 List<Expr> args = new ArrayList<>();
                 if (current.type != TokenType.RPAREN) {
