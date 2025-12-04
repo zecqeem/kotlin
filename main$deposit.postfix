@@ -1,0 +1,20 @@
+.target: Postfix Machine
+.version: 0.2
+
+.vars(
+    amount int
+)
+
+.globVarList(
+    bank_balance
+)
+
+.code(
+    bank_balance l-val
+    bank_balance r-val
+    amount r-val
+    + math_op
+    := assign_op
+    bank_balance r-val
+    RET ret_op
+)

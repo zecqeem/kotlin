@@ -2,7 +2,7 @@ package org.example.tokens;
 
 public enum TokenType {
     // Ключевые слова
-    IF, ELSE, WHILE, FUN, RETURN, CONST, TRUE, FALSE, INPUT, PRINT,
+    IF, ELSE, WHILE, FUN, RETURN, CONST, TRUE, FALSE, INPUT, PRINT, VAR,
 
     // Идентификаторы и литералы
     IDENTIFIER, INT, FLOAT, STRING, BOOL,
@@ -10,7 +10,7 @@ public enum TokenType {
 
     // Операторы
     PLUS, MINUS, STAR, SLASH, CARET,ARROW,
-    EQ, NEQ, LT, GT, LE, GE, ASSIGN, COLON,COMMA,
+    EQ, NEQ, LT, GT, LE, GE, ASSIGN, COLON,COMMA,NOT,
 
     // Скобки
     LPAREN, RPAREN, LBRACE, RBRACE,

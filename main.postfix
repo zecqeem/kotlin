@@ -1,0 +1,125 @@
+.target: Postfix Machine
+.version: 0.2
+
+.vars(
+    PI float
+    GREETING string
+    x int
+    y float
+    z bool
+    name string
+)
+
+.funcs(
+    sum int 2
+    is_positive1 bool 1
+    calculate_area float 1
+)
+
+.labels(
+    m1 37
+    m2 41
+    m3 43
+    m4 62
+)
+
+.code(
+    PI l-val
+    3.14159 float
+    := assign_op
+    GREETING l-val
+    "Hello, world!" string
+    := assign_op
+    x l-val
+    10 int
+    := assign_op
+    y l-val
+    5.5 float
+    := assign_op
+    z l-val
+    false bool
+    := assign_op
+    name l-val
+    "gorb user" string
+    := assign_op
+    "All tokens and constructions example" string
+    OUT out_op
+    x l-val
+    x r-val
+    5 int
+    sum CALL
+    := assign_op
+    1 int
+    x r-val
+    * math_op
+    OUT out_op
+    y r-val
+    is_positive1 CALL
+    m1 label
+    JF jf
+    "y is positive" string
+    OUT out_op
+    m2 label
+    JMP jump
+    m1 label
+    : colon
+    "y is not positive" string
+    OUT out_op
+    m2 label
+    : colon
+    m3 label
+    : colon
+    x r-val
+    10 int
+    > rel_op
+    m4 label
+    JF jf
+    x l-val
+    x r-val
+    1 int
+    - math_op
+    := assign_op
+    "x is now " string
+    x r-val
+    i2s conv
+    CAT cat_op
+    OUT out_op
+    m3 label
+    JMP jump
+    m4 label
+    : colon
+    y l-val
+    2.0 float
+    calculate_area CALL
+    := assign_op
+    y r-val
+    OUT out_op
+    z l-val
+    5 int
+    3 int
+    > rel_op
+    true bool
+    == rel_op
+    := assign_op
+    z r-val
+    OUT out_op
+    "Enter a number: " string
+    OUT out_op
+    y l-val
+    INP inp_op
+    s2f conv
+    := assign_op
+    "You entered: " string
+    y r-val
+    f2s conv
+    CAT cat_op
+    OUT out_op
+    "" string
+    OUT out_op
+    GREETING r-val
+    ", " string
+    CAT cat_op
+    name r-val
+    CAT cat_op
+    OUT out_op
+)

@@ -1,3 +1,5 @@
 package org.example.ast;
 
-public interface Node {}
+public interface Node {
+}
+

@@ -1,4 +1,4 @@
-package org.example;
+package org.example.lexer;
 
 import org.example.tokens.Token;
 import org.example.tokens.TokenType;
@@ -15,7 +15,7 @@ public class Lexer {
     private final Map<String, Integer> tableOfId = new LinkedHashMap<>();
     private final Map<String, String> tableOfConst = new LinkedHashMap<>();
 
-    // === DFA States ===
+    //  DFA States
     private static final int S_START = 0;
     // ID / Keywords
     private static final int S_ID = 1;
@@ -51,8 +51,11 @@ public class Lexer {
     private static final int S_NOT = 26;
     private static final int S_NOT_EQ = 27; // !=
     private static final int S_NOT_FIN = 28; // * (!)
-    // Single Char Ops (+ * ^ ( ) { } , :)
+    // Single Char Ops (+ * ^ ( ) { } , : ;)
     private static final int S_OP = 99;
+
+    // ERROR STATE
+    private static final int S_ERR = 100;
 
     // States that require putCharBack (Star states)
     private static final Set<Integer> starStates = Set.of(
@@ -75,19 +78,12 @@ public class Lexer {
 
     private void addTrans(int state, CharClass cls, int next) {
         stf.computeIfAbsent(state, k -> new HashMap<>()).put(cls, next);
-        // Hack for String body: accept everything except quote
-        if (state == S_STR_BODY && cls == CharClass.OTHER) {
-            for (CharClass c : CharClass.values()) {
-                if (c != CharClass.QUOTE) stf.get(state).put(c, next);
-            }
-        }
     }
 
     private void initTransitions() {
         // 0: Start
         addTrans(S_START, CharClass.LETTER, S_ID);
         addTrans(S_START, CharClass.DIGIT, S_INT);
-
         addTrans(S_START, CharClass.QUOTE, S_STR_START);
         addTrans(S_START, CharClass.MINUS, S_MINUS);
         addTrans(S_START, CharClass.EQ, S_EQ);
@@ -96,6 +92,8 @@ public class Lexer {
         addTrans(S_START, CharClass.LT, S_LT);
         addTrans(S_START, CharClass.EXCL, S_NOT);
         addTrans(S_START, CharClass.OP, S_OP);
+        // Error handling for Start (Unexpected chars like @, #, etc.)
+        addTrans(S_START, CharClass.OTHER, S_ERR);
 
         // 1: ID
         addTrans(S_ID, CharClass.LETTER, S_ID);
@@ -106,7 +104,11 @@ public class Lexer {
         addTrans(S_INT, CharClass.DIGIT, S_INT);
         addTrans(S_INT, CharClass.DOT, S_DOT);
         addTrans(S_INT, CharClass.OTHER, S_INT_FIN); // *
+
+        // Dot logic: Digit -> Float, Other -> ERROR (e.g. "12.a")
         addTrans(S_DOT, CharClass.DIGIT, S_FLOAT);
+        addTrans(S_DOT, CharClass.OTHER, S_ERR);
+
         addTrans(S_FLOAT, CharClass.DIGIT, S_FLOAT);
         addTrans(S_FLOAT, CharClass.OTHER, S_FLOAT_FIN); // *
 
@@ -126,11 +128,21 @@ public class Lexer {
         addTrans(S_NOT, CharClass.EQ, S_NOT_EQ);      // !=
         addTrans(S_NOT, CharClass.OTHER, S_NOT_FIN);  // * !
 
-        // Strings
-        addTrans(S_STR_START, CharClass.OTHER, S_STR_BODY);
-        addTrans(S_STR_START, CharClass.LETTER, S_STR_BODY);
+        // Strings (Correct Logic)
+        // 1. Empty string case: "" -> Fin
+        addTrans(S_STR_START, CharClass.QUOTE, S_STR_FIN);
+
+        // 2. Body logic
+        for (CharClass c : CharClass.values()) {
+            if (c != CharClass.QUOTE) {
+                // From Start to Body (non-empty string start)
+                addTrans(S_STR_START, c, S_STR_BODY);
+                // Within Body (continue string)
+                addTrans(S_STR_BODY, c, S_STR_BODY);
+            }
+        }
+        // 3. Closing quote
         addTrans(S_STR_BODY, CharClass.QUOTE, S_STR_FIN);
-        addTrans(S_STR_BODY, CharClass.OTHER, S_STR_BODY);
     }
 
     private CharClass classOfChar(char c) {
@@ -146,7 +158,8 @@ public class Lexer {
         if (c == '=') return CharClass.EQ;
         if (c == '/') return CharClass.SLASH;
         if (c == '!') return CharClass.EXCL;
-        if ("+*^(){},:".indexOf(c) != -1) return CharClass.OP;
+        // Added semicolon ';' to operators
+        if ("+*^(){},:;".indexOf(c) != -1) return CharClass.OP;
         return CharClass.OTHER;
     }
 
@@ -173,11 +186,17 @@ public class Lexer {
             Integer nextState = null;
 
             if (stf.containsKey(state)) nextState = stf.get(state).get(cls);
-            if (nextState == null && stf.containsKey(state) && stf.get(state).containsKey(CharClass.OTHER)) {
+
+            // =FIX HERE
+            // Check if it is a whitespace/newline in the start state.
+            // If yes, disable fallback to OTHER (to avoid going to S_ERR).
+            boolean isSpaceInStart = (state == S_START && (cls == CharClass.WS || cls == CharClass.NL));
+
+            if (!isSpaceInStart && nextState == null && stf.containsKey(state) && stf.get(state).containsKey(CharClass.OTHER)) {
                 nextState = stf.get(state).get(CharClass.OTHER);
             }
 
-            // 2. Error / Skip handling in Start State
+            // 2. Error / Skip handling
             if (nextState == null) {
                 // If we are in Start and see Whitespace or NewLine, skip and update line count
                 if (state == S_START && (cls == CharClass.WS || cls == CharClass.NL)) {
@@ -185,13 +204,13 @@ public class Lexer {
                     pos++;
                     continue;
                 }
-                // Handle unmapped OP chars in Start (Backup safety)
-                if (state == S_START && cls == CharClass.OP) {
-                    processing(S_OP, String.valueOf(c), tokens);
-                    pos++;
-                    continue;
-                }
-                throw new RuntimeException("Lexer Error line " + line + ": Unexpected '" + c + "'");
+                // Fallback panic
+                throw new RuntimeException("Lexer Error line " + line + ": Unexpected char '" + c + "'");
+            }
+
+            // EXPLICIT ERROR STATE CHECK
+            if (nextState == S_ERR) {
+                throw new RuntimeException("Lexer Error line " + line + ": Invalid syntax or unexpected char '" + c + "'");
             }
 
             // 3. Transition Logic
@@ -203,8 +222,7 @@ public class Lexer {
             } else {
                 // Direct Transitions (consume char)
 
-                // Special case: Single Char Operators or Double Operators (==, ->, >=, <=)
-                // We consume the char, emit the token immediately, and reset to Start
+                // Special case: Single Char Operators or Double Operators
                 if (nextState == S_EQ_EQ || nextState == S_ARROW ||
                         nextState == S_GT_EQ || nextState == S_LT_EQ ||
                         nextState == S_NOT_EQ || nextState == S_OP) {
@@ -244,7 +262,7 @@ public class Lexer {
                 processing(finState, lexeme.toString(), tokens);
             }
         }
-        tokens.add(new Token(TokenType.EOF, ""));
+        tokens.add(new Token(TokenType.EOF, "",line));
 
         printTables();
         return tokens;
@@ -297,7 +315,7 @@ public class Lexer {
             default: type = TokenType.EOF;
         }
 
-        tokens.add(new Token(type, lexeme));
+        tokens.add(new Token(type, lexeme,line));
         String record = String.format("%-5d | %-15s | %-15s | %-5s", line, lexeme, type, idx);
         tableOfSymb.add(record);
     }
@@ -346,17 +364,17 @@ public class Lexer {
     }
 
     public void printTables() {
-        System.out.println("\n=== 3.2.2 Parsing Table ===");
+        System.out.println("\n 3.2.2 Parsing Table ");
         System.out.println(String.format("%-5s | %-15s | %-15s | %-5s", "Line", "Lexeme", "Token", "Index"));
         System.out.println("-------------------------------------------------------");
         for (String row : tableOfSymb) {
             System.out.println(row);
         }
 
-        System.out.println("\n=== 3.2.3 ID Table ===");
+        System.out.println("\n 3.2.3 ID Table ");
         tableOfId.forEach((k, v) -> System.out.println(k + " -> " + v));
 
-        System.out.println("\n=== 3.2.4 Const Table ===");
+        System.out.println("\n 3.2.4 Const Table ");
         tableOfConst.forEach((k, v) -> System.out.println(k + " -> " + v));
     }
 }

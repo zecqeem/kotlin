@@ -3,7 +3,8 @@ package org.example.ast;
 
 public class PrintStmt implements Stmt {
     public final Expr expr;
-    public PrintStmt(Expr expr) { this.expr = expr; }
+    public final int line;
+    public PrintStmt(Expr expr,int line) { this.expr = expr;this.line = line; }
 
     @Override
     public String toString() {

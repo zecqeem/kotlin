@@ -1,0 +1,41 @@
+.target: Postfix Machine
+.version: 0.2
+
+.vars(
+    n int
+)
+
+.funcs(
+    fib int 1
+)
+
+.labels(
+    m1 9
+    m2 11
+)
+
+.code(
+    n r-val
+    1 int
+    <= rel_op
+    m1 label
+    JF jf
+    n r-val
+    RET ret_op
+    m2 label
+    JMP jump
+    m1 label
+    : colon
+    m2 label
+    : colon
+    n r-val
+    1 int
+    - math_op
+    fib CALL
+    n r-val
+    2 int
+    - math_op
+    fib CALL
+    + math_op
+    RET ret_op
+)

@@ -1,0 +1,20 @@
+.target: Postfix Machine
+.version: 0.2
+
+.vars(
+    radius float
+)
+
+.globVarList(
+    PI
+)
+
+.code(
+    PI r-val
+    radius r-val
+    2 int
+    i2f conv
+    ^ math_op
+    * math_op
+    RET ret_op
+)

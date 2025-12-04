@@ -2,7 +2,8 @@ package org.example.ast;
 
 public class ReturnStmt implements Stmt {
     public final Expr expr;
-    public ReturnStmt(Expr expr) { this.expr = expr;}
+    public final int line;
+    public ReturnStmt(Expr expr,int line) { this.expr = expr;this.line = line;}
 
     @Override
     public String toString() {

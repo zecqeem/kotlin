@@ -2,12 +2,16 @@ package org.example.ast;
 
 public class VarDecl implements Stmt {
     public final String name;
-    public final String type; // float, int, string, bool
-    public final Expr value;
-    public VarDecl(String name, String type, Expr value) {
+    public final String type;      // Может быть null, если это const (тип выводится)
+    public final Expr initializer; // Может быть null (например, в аргументах функции)
+    public final boolean isConstant; // Новое поле
+    public final int line;
+    public VarDecl(String name, String type, Expr initializer, boolean isConstant,int line) {
         this.name = name;
         this.type = type;
-        this.value = value;
+        this.initializer = initializer;
+        this.isConstant = isConstant;
+        this.line = line;
     }
 
     @Override
@@ -15,7 +19,8 @@ public class VarDecl implements Stmt {
         return "VarDecl{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
-                ", value=" + value +
+                ", initializer=" + initializer +
+                ", isConstant=" + isConstant +
                 '}';
     }
 }

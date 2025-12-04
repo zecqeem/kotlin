@@ -3,10 +3,11 @@ package org.example.tokens;
 public class Token {
     public final TokenType type;
     public final String text;
-
-    public Token(TokenType type, String text) {
+    public final int line;
+    public Token(TokenType type, String text,int line) {
         this.type = type;
         this.text = text;
+        this.line = line;
     }
 
     @Override

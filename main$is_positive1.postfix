@@ -1,0 +1,29 @@
+.target: Postfix Machine
+.version: 0.2
+
+.vars(
+    num float
+)
+
+.labels(
+    m1 9
+    m2 13
+)
+
+.code(
+    num r-val
+    0.0 float
+    > rel_op
+    m1 label
+    JF jf
+    true bool
+    RET ret_op
+    m2 label
+    JMP jump
+    m1 label
+    : colon
+    false bool
+    RET ret_op
+    m2 label
+    : colon
+)

@@ -1,4 +1,4 @@
-package org.example;
+package org.example.syntaxAndSemantic;
 
 import org.example.ast.*;
 import org.example.tokens.Token;
@@ -15,38 +15,28 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    // === Helpers ===
+    // Helpers
 
-    // Повертає поточний токен
-    private Token peek() {
-        return tokens.get(current);
-    }
+    private Token peek() { return tokens.get(current); }
 
-    // Перевіряє тип поточного токена
     private boolean check(TokenType type) {
         if (isAtEnd()) return false;
         return peek().type == type;
     }
 
-    // Споживає токен, якщо він очікуваного типу, інакше кидає помилку
     private Token consume(TokenType type, String message) {
-        if (check(type)) {
-            return advance();
-        }
-        throw new RuntimeException(message + " at " + peek());
+        if (check(type)) return advance();
+        throw new RuntimeException(message + " at line " + peek().line);
     }
 
-    // Повертає поточний токен і переходить до наступного
     private Token advance() {
         if (!isAtEnd()) current++;
         return tokens.get(current - 1);
     }
 
-    private boolean isAtEnd() {
-        return peek().type == TokenType.EOF;
-    }
+    private boolean isAtEnd() { return peek().type == TokenType.EOF; }
 
-    // === Parsing Logic ===
+    //Parsing Logic
 
     public List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
@@ -66,274 +56,237 @@ public class Parser {
         if (check(TokenType.INPUT)) return inputStmt();
         if (check(TokenType.RETURN)) return returnStmt();
         if (check(TokenType.LBRACE)) return block();
-
         return assignOrExprStmt();
     }
 
     // --- Declarations ---
 
     private Stmt constDecl() {
-        consume(TokenType.CONST, "Expected 'const'");
+        Token keyword = consume(TokenType.CONST, "Expected 'const'");
         String name = consume(TokenType.IDENTIFIER, "Expected const name").text;
-
-        // В твоїй граматиці const може бути без явного типу: const PI = 3.14
         String type = null;
-
-        // Якщо раптом є явна типізація (const PI : float = ...), додамо перевірку:
         if (check(TokenType.COLON)) {
             consume(TokenType.COLON, "Expected ':'");
             type = parseType();
         }
-
-        consume(TokenType.ASSIGN, "Expected '=' in const declaration");
+        consume(TokenType.ASSIGN, "Expected '='");
         Expr value = expression();
-
-        return new VarDecl(name, type, value, true);
+        // Pass keyword.line
+        return new VarDecl(name, type, value, true, keyword.line);
     }
 
     private Stmt varDecl() {
-        consume(TokenType.VAR, "Expected 'var'");
+        Token keyword = consume(TokenType.VAR, "Expected 'var'");
         String name = consume(TokenType.IDENTIFIER, "Expected variable name").text;
-
-        consume(TokenType.COLON, "Expected ':' after variable name");
-        String type = parseType(); // Обов'язково зчитуємо тип (int, float...)
-
-        consume(TokenType.ASSIGN, "Expected '=' in variable declaration");
+        consume(TokenType.COLON, "Expected ':'");
+        String type = parseType();
+        consume(TokenType.ASSIGN, "Expected '='");
         Expr value = expression();
-
-        return new VarDecl(name, type, value, false);
+        return new VarDecl(name, type, value, false, keyword.line);
     }
 
     private Stmt funDecl() {
-        consume(TokenType.FUN, "Expected 'fun'");
+        Token keyword = consume(TokenType.FUN, "Expected 'fun'");
         String name = consume(TokenType.IDENTIFIER, "Expected function name").text;
         consume(TokenType.LPAREN, "Expected '('");
-
         List<VarDecl> params = new ArrayList<>();
         if (!check(TokenType.RPAREN)) {
             do {
-                if (params.size() > 0) {
-                    consume(TokenType.COMMA, "Expected ',' between parameters");
-                }
-                String paramName = consume(TokenType.IDENTIFIER, "Expected parameter name").text;
-                consume(TokenType.COLON, "Expected ':' after parameter name");
+                if (params.size() > 0) consume(TokenType.COMMA, "Expected ','");
+                Token paramNameToken = consume(TokenType.IDENTIFIER, "Expected param name");
+                consume(TokenType.COLON, "Expected ':'");
                 String paramType = parseType();
-                params.add(new VarDecl(paramName, paramType, null, false));
-            } while (check(TokenType.COMMA)); // Поки є коми - читаємо далі
+                // Parameters are also VarDecls
+                params.add(new VarDecl(paramNameToken.text, paramType, null, false, paramNameToken.line));
+            } while (check(TokenType.COMMA));
         }
         consume(TokenType.RPAREN, "Expected ')'");
-
         consume(TokenType.ARROW, "Expected '->'");
         String returnType = parseType();
-
-        BlockStmt body = (BlockStmt) block();
-        return new FunDecl(name, returnType, params, body);
+        Stmt body = block(); // block() returns BlockStmt
+        return new FunDecl(name, returnType, params, (BlockStmt) body, keyword.line);
     }
 
     // --- Statements ---
 
     private Stmt ifStmt() {
-        consume(TokenType.IF, "Expected 'if'");
+        Token keyword = consume(TokenType.IF, "Expected 'if'");
         consume(TokenType.LPAREN, "Expected '('");
         Expr condition = expression();
         consume(TokenType.RPAREN, "Expected ')'");
-
         Stmt thenBranch = block();
         Stmt elseBranch = null;
-
         if (check(TokenType.ELSE)) {
             consume(TokenType.ELSE, "Expected 'else'");
-            if (check(TokenType.IF)) {
-                // Підтримка "else if"
-                elseBranch = ifStmt();
-            } else {
-                elseBranch = block();
-            }
+            elseBranch = check(TokenType.IF) ? ifStmt() : block();
         }
-
-        return new IfStmt(condition, thenBranch, elseBranch);
+        return new IfStmt(condition, thenBranch, elseBranch, keyword.line);
     }
 
     private Stmt whileStmt() {
-        consume(TokenType.WHILE, "Expected 'while'");
+        Token keyword = consume(TokenType.WHILE, "Expected 'while'");
         consume(TokenType.LPAREN, "Expected '('");
         Expr condition = expression();
         consume(TokenType.RPAREN, "Expected ')'");
         Stmt body = block();
-        return new WhileStmt(condition, body);
+        return new WhileStmt(condition, body, keyword.line);
     }
 
     private Stmt block() {
-        consume(TokenType.LBRACE, "Expected '{'");
+        Token brace = consume(TokenType.LBRACE, "Expected '{'");
         List<Stmt> statements = new ArrayList<>();
         while (!check(TokenType.RBRACE) && !isAtEnd()) {
             statements.add(statement());
         }
         consume(TokenType.RBRACE, "Expected '}'");
-        return new BlockStmt(statements);
+        return new BlockStmt(statements, brace.line);
     }
 
     private Stmt printStmt() {
-        consume(TokenType.PRINT, "Expected 'print'");
+        Token keyword = consume(TokenType.PRINT, "Expected 'print'");
         consume(TokenType.LPAREN, "Expected '('");
         Expr expr = expression();
         consume(TokenType.RPAREN, "Expected ')'");
-        return new PrintStmt(expr);
+        return new PrintStmt(expr, keyword.line);
     }
 
     private Stmt inputStmt() {
-        consume(TokenType.INPUT, "Expected 'input'");
+        Token keyword = consume(TokenType.INPUT, "Expected 'input'");
         consume(TokenType.LPAREN, "Expected '('");
-        String name = consume(TokenType.IDENTIFIER, "Expected variable name").text;
+        String name = consume(TokenType.IDENTIFIER, "Expected var name").text;
         consume(TokenType.RPAREN, "Expected ')'");
-        return new InputStmt(name);
+        return new InputStmt(name, keyword.line);
     }
 
     private Stmt returnStmt() {
-        consume(TokenType.RETURN, "Expected 'return'");
-        Expr value = expression(); // Тут можна додати перевірку на порожній return
-        return new ReturnStmt(value);
+        Token keyword = consume(TokenType.RETURN, "Expected 'return'");
+        Expr value = expression();
+        return new ReturnStmt(value, keyword.line);
     }
 
     private Stmt assignOrExprStmt() {
+        // Capture line before parsing expression just in case
+        int line = peek().line;
         Expr expr = expression();
 
-        // Якщо після виразу йде '=', значить це присвоєння (x = 5)
         if (check(TokenType.ASSIGN)) {
-            consume(TokenType.ASSIGN, "Expected '='");
+            Token equals = consume(TokenType.ASSIGN, "Expected '='");
             if (expr instanceof Variable) {
                 String name = ((Variable) expr).name;
                 Expr value = expression();
-                return new AssignStmt(name, value);
+                return new AssignStmt(name, value, equals.line);
             }
-            throw new RuntimeException("Invalid assignment target: " + expr);
+            throw new RuntimeException("Invalid assignment target at line " + equals.line);
         }
-
-        return new ExprStmt(expr);
+        return new ExprStmt(expr, line);
     }
 
-    // === Expressions (Precedence Climbing) ===
+    //Expressions
 
-    private Expr expression() {
-        return equality();
-    }
+    private Expr expression() { return equality(); }
 
-    // 1. Equality: ==, !=
     private Expr equality() {
         Expr expr = comparison();
         while (check(TokenType.EQ) || check(TokenType.NEQ)) {
-            String op = advance().text;
+            Token op = advance();
             Expr right = comparison();
-            expr = new BinaryExpr(expr, op, right);
+            expr = new BinaryExpr(expr, op.text, right, op.line);
         }
         return expr;
     }
 
-    // 2. Comparison: >, >=, <, <=
     private Expr comparison() {
         Expr expr = term();
         while (check(TokenType.GT) || check(TokenType.GE) ||
                 check(TokenType.LT) || check(TokenType.LE)) {
-            String op = advance().text;
+            Token op = advance();
             Expr right = term();
-            expr = new BinaryExpr(expr, op, right);
+            expr = new BinaryExpr(expr, op.text, right, op.line);
         }
         return expr;
     }
 
-    // 3. Term: +, -
     private Expr term() {
         Expr expr = factor();
         while (check(TokenType.PLUS) || check(TokenType.MINUS)) {
-            String op = advance().text;
+            Token op = advance();
             Expr right = factor();
-            expr = new BinaryExpr(expr, op, right);
+            expr = new BinaryExpr(expr, op.text, right, op.line);
         }
         return expr;
     }
 
-    // 4. Factor: *, /
     private Expr factor() {
         Expr expr = power();
         while (check(TokenType.STAR) || check(TokenType.SLASH)) {
-            String op = advance().text;
+            Token op = advance();
             Expr right = power();
-            expr = new BinaryExpr(expr, op, right);
+            expr = new BinaryExpr(expr, op.text, right, op.line);
         }
         return expr;
     }
 
-    // 5. Power: ^
     private Expr power() {
-        Expr expr = unary();
-        while (check(TokenType.CARET)) {
-            String op = advance().text;
-            Expr right = unary(); // Або power() для правої асоціативності
-            expr = new BinaryExpr(expr, op, right);
+        Expr left = unary();
+        if (check(TokenType.CARET)) {
+            Token op = advance();
+            Expr right = power(); // Right associative
+            return new BinaryExpr(left, op.text, right, op.line);
         }
-        return expr;
+        return left;
     }
 
-    // 6. Unary: !, - (optional, added for completeness)
     private Expr unary() {
         if (check(TokenType.NOT) || check(TokenType.MINUS)) {
-            String op = advance().text;
+            Token op = advance();
             Expr right = unary();
-            // У тебе немає UnaryExpr в AST, тому емулюємо:
-            if (op.equals("-")) {
-                // -x -> 0 - x
-                return new BinaryExpr(new IntLiteral(0), "-", right);
+            if (op.text.equals("-")) {
+                // Synthetic "0" for unary minus gets the line of the minus sign
+                return new BinaryExpr(new IntLiteral(0, op.line), "-", right, op.line);
             }
-            // Для NOT (!) доведеться додати UnaryExpr в AST, або поки що ігнорувати
-            // Але оскільки в лексері є NOT, давай його обробимо хоча б як primary
+            // For NOT, handle accordingly or treat as primary
         }
         return primary();
     }
 
-    // 7. Primary: literals, vars, grouping
     private Expr primary() {
         if (check(TokenType.FALSE)) {
-            advance();
-            return new BoolLiteral(false);
+            Token t = advance();
+            return new BoolLiteral(false, t.line);
         }
         if (check(TokenType.TRUE)) {
-            advance();
-            return new BoolLiteral(true);
+            Token t = advance();
+            return new BoolLiteral(true, t.line);
         }
         if (check(TokenType.INT)) {
-            int val = Integer.parseInt(advance().text);
-            return new IntLiteral(val);
+            Token t = advance();
+            return new IntLiteral(Integer.parseInt(t.text), t.line);
         }
         if (check(TokenType.FLOAT)) {
-            double val = Double.parseDouble(advance().text);
-            return new FloatLiteral(val);
+            Token t = advance();
+            return new FloatLiteral(Double.parseDouble(t.text), t.line);
         }
         if (check(TokenType.STRING)) {
-            String val = advance().text;
-            // Видаляємо лапки "" з лексеми, якщо вони там є
-            if (val.startsWith("\"") && val.endsWith("\"")) {
-                val = val.substring(1, val.length() - 1);
-            }
-            return new StringLiteral(val);
+            Token t = advance();
+            String val = t.text;
+            if (val.startsWith("\"")) val = val.substring(1, val.length() - 1);
+            return new StringLiteral(val, t.line);
         }
         if (check(TokenType.IDENTIFIER)) {
-            String name = advance().text;
+            Token nameToken = advance();
             if (check(TokenType.LPAREN)) {
-                // Function call
-                consume(TokenType.LPAREN, "Expected '(' after function name");
+                consume(TokenType.LPAREN, "Expected '('");
                 List<Expr> args = new ArrayList<>();
                 if (!check(TokenType.RPAREN)) {
                     do {
-                        if (args.size() > 0) {
-                            consume(TokenType.COMMA, "Expected ','");
-                        }
+                        if (args.size() > 0) consume(TokenType.COMMA, "Expected ','");
                         args.add(expression());
-                    } while (check(TokenType.COMMA)); // Помилка в циклі виправлена
+                    } while (check(TokenType.COMMA));
                 }
                 consume(TokenType.RPAREN, "Expected ')'");
-                return new CallExpr(name, args);
+                return new CallExpr(nameToken.text, args, nameToken.line);
             }
-            return new Variable(name);
+            return new Variable(nameToken.text, nameToken.line);
         }
         if (check(TokenType.LPAREN)) {
             advance();
@@ -341,16 +294,14 @@ public class Parser {
             consume(TokenType.RPAREN, "Expected ')'");
             return expr;
         }
-
-        throw new RuntimeException("Unexpected token: " + peek());
+        throw new RuntimeException("Unexpected token at line " + peek().line);
     }
 
-    // Helper for Types
     private String parseType() {
         if (check(TokenType.INT_TYPE)) return consume(TokenType.INT_TYPE, "").text;
         if (check(TokenType.FLOAT_TYPE)) return consume(TokenType.FLOAT_TYPE, "").text;
         if (check(TokenType.BOOL_TYPE)) return consume(TokenType.BOOL_TYPE, "").text;
         if (check(TokenType.STRING_TYPE)) return consume(TokenType.STRING_TYPE, "").text;
-        throw new RuntimeException("Expected type (int, float, bool, string), got " + peek());
+        throw new RuntimeException("Expected type at line " + peek().line);
     }
 }

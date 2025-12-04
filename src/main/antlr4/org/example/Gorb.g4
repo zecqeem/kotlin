@@ -1,7 +1,8 @@
 grammar Gorb;
-@header {
-    package org.example.codegen.antlr;
-}
+
+
+// --- PARSER RULES ---
+
 program : statement* EOF;
 
 statement
@@ -36,6 +37,8 @@ type : INT_TYPE | FLOAT_TYPE | BOOL_TYPE | STRING_TYPE;
 ifStmt : IF LPAREN expression RPAREN statement (ELSE statement)?;
 whileStmt : WHILE LPAREN expression RPAREN statement;
 
+// --- EXPRESSIONS ---
+
 expression : relationalExpr;
 
 relationalExpr : addSubExpr ( (LT|GT|EQ_EQ|NEQ|LE|GE) addSubExpr )* ;
@@ -57,6 +60,8 @@ primaryExpr
     ;
 
 expressionList : expression (COMMA expression)*;
+
+// --- LEXER RULES ---
 
 VAR : 'var';
 CONST : 'const';
